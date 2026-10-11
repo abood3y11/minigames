@@ -1,0 +1,20 @@
+:root {
+  --bg: #0a0f24; --panel: #141b3a; --panel2: #1e2750; --text: #f4f6ff; --mut: #9aa6d6;
+  --acc: #7c5cff; --ok: #22c55e; --bad: #ef4444; --warn: #f59e0b;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: radial-gradient(1200px 700px at 80% -10%, #25308a55, transparent), radial-gradient(900px 600px at 0% 110%, #7c5cff33, transparent), var(--bg);
+  color: var(--text); direction: rtl;
+  font-family: 'Segoe UI', Tahoma, 'Noto Sans Arabic', 'Geeza Pro', system-ui, sans-serif;
+}
+button { font: inherit; color: inherit; cursor: pointer; border: 0; }
+.team { --c: #888; color: var(--c); }
+.bar { height: 14px; border-radius: 99px; background: #ffffff18; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #7c5cff, #22d3ee); border-radius: 99px; }
+.bar.hot > i { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+@keyframes pop { from { transform: scale(.6); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes slide { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes shake { 0%,100% { transform: none } 25% { transform: translateX(-10px) } 75% { transform: translateX(10px) } }
+@keyframes pulse { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } }

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>PLAYROOM</title>
+<link rel="stylesheet" href="/common.css">
+<style>
+  body { min-height: 100dvh; display: flex; flex-direction: column; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  header { padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; background: var(--panel); border-bottom: 5px solid var(--c, #444); font-weight: 800; }
+  header small { color: var(--mut); font-weight: 400; display: block; }
+  header .sc { font-size: 26px; direction: ltr; }
+  main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 18px; text-align: center; }
+  h1 { margin: 0; font-size: 34px; } h2 { margin: 0; font-size: 26px; line-height: 1.4; }
+  .mut { color: var(--mut); font-size: 18px; }
+  input { font: inherit; font-size: 24px; width: 100%; max-width: 440px; padding: 16px; border-radius: 16px; border: 2px solid #ffffff30; background: var(--panel); color: var(--text); text-align: center; user-select: text; -webkit-user-select: text; }
+  input:focus { outline: 0; border-color: var(--acc); }
+  .btn { background: var(--acc); font-size: 24px; font-weight: 800; padding: 16px 28px; border-radius: 16px; width: 100%; max-width: 440px; }
+  .btn:active { transform: scale(.97); }
+  .btn[disabled] { opacity: .45; }
+  .giant { width: min(78vw, 56vh); height: min(78vw, 56vh); border-radius: 50%; font-size: 44px; font-weight: 900; box-shadow: 0 14px 0 #00000055, 0 0 60px -10px currentColor; }
+  .giant:active:not([disabled]) { transform: translateY(10px); box-shadow: 0 4px 0 #00000055; }
+  .giant[disabled] { filter: grayscale(.9) brightness(.55); box-shadow: none; }
+  .buzz { background: #dc2626; color: #fff; } .go { background: #16a34a; } .wait { background: #b91c1c; }
+  .bombbtn { background: #f59e0b; color: #1a1200; }
+  .display { font-size: 34px; font-weight: 800; line-height: 1.5; background: var(--panel); padding: 14px 18px; border-radius: 16px; width: 100%; max-width: 480px; user-select: none; }
+  .tiles { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .tiles span { background: var(--panel2); border-radius: 12px; padding: 4px 14px; font-size: 38px; font-weight: 900; }
+  .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; max-width: 440px; }
+  .opts button { background: var(--panel2); border-radius: 18px; font-size: 54px; padding: 18px 0; }
+  .opts button:active { background: var(--acc); }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .shake { animation: shake .3s; }
+  .big { font-size: 110px; font-weight: 900; line-height: 1; }
+  .pts { font-size: 70px; font-weight: 900; direction: ltr; }
+  .toast { position: fixed; top: 80px; background: #000c; padding: 10px 20px; border-radius: 12px; font-size: 20px; z-index: 5; }
+</style>
+</head>
+<body>
+<header id="hd" style="display:none"></header>
+<main id="main"><div class="mut">جارٍ الاتصال…</div></main>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/common.js"></script>
+<script>
+let S = null, ME = null, sig = '', draft = '';
+let pid = localStorage.getItem('pr_pid');
+if (!pid) { pid = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)); localStorage.setItem('pr_pid', pid); }
+const main = $('#main'), hd = $('#hd');
+const vib = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+const toast = (t) => { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.append(d); setTimeout(() => d.remove(), 1400); };
+
+const sock = connect({ role: 'player', pid }, {
+  state(s) { S = s; render(); },
+  me(m) { ME = m; render(); },
+  kicked() { localStorage.removeItem('pr_pid'); main.innerHTML = '<h1>تمت إزالتك</h1>'; sock.disconnect(); },
+  connect_error() { main.innerHTML = '<div class="mut">تعذّر الاتصال… نحاول مجدداً</div>'; },
+});
+
+function join() {
+  const name = $('#nm').value.trim();
+  if (!name) return;
+  localStorage.setItem('pr_name', name);
+  sock.emit('join', { name }, (r) => { if (!r.ok) toast(r.err); });
+}
+
+function answer(v) {
+  sock.emit('answer', v, (res) => {
+    if (res === 'wrong') { vib(200); toast('❌ غير صحيح، حاول مجدداً'); const i = $('#inp'); if (i) { i.classList.add('shake'); setTimeout(() => i.classList.remove('shake'), 300); } }
+    else if (res === 'correct') { vib([60, 40, 60]); }
+    else if (res === 'dead') { vib(200); }
+    else if (res && res.startsWith('ok:')) { toast('✅ تم الإرسال: ' + res.slice(3)); const l = $('#sent'); if (l) l.textContent = 'إجابتك: ' + res.slice(3) + ' (يمكنك التعديل)'; }
+    else if (res === 'bad') toast('أدخل رقماً');
+  });
+}
+
+function header() {
+  if (!ME?.joined || !S) { hd.style.display = 'none'; return; }
+  const t = S.teams[ME.team] || S.teams[0];
+  hd.style.display = 'flex'; hd.style.setProperty('--c', t.color);
+  hd.innerHTML = `<div>${esc(ME.name)}<small>${t.emoji} فريق ${t.name}</small></div><div class="sc">${t.emoji} ${t.score}</div>`;
+}
+
+const waitView = (msg, sub) => `<h1>${msg}</h1><div class="mut">${sub || ''}</div>`;
+
+function view() {
+  if (!S || !ME) return { sig: 'load', html: '<div class="mut">جارٍ الاتصال…</div>' };
+  if (!ME.joined) return {
+    sig: 'join',
+    html: `<h1>🎮 ${esc(S.event)}</h1><div class="mut">اكتب اسمك وادخل اللعبة</div>
+      <input id="nm" maxlength="20" placeholder="اسمك" autocomplete="off" value="${esc(localStorage.getItem('pr_name') || '')}">
+      <button class="btn" onclick="join()">ادخل 🔥</button>`,
+    after() { $('#nm').addEventListener('keydown', (e) => e.key === 'Enter' && join()); },
+  };
+  const t = S.teams[ME.team] || S.teams[0], r = S.round, st = ME.st || {};
+  if (S.phase === 'lobby') return { sig: 'lobby' + ME.team, html: `<div class="big">${t.emoji}</div><h1 style="color:${t.color}">فريق ${t.name}</h1>` + waitView('انتظر المضيف…', `${S.online} لاعب متصل`) };
+  if (S.phase === 'final') {
+    const win = S.final.winners.includes(ME.team);
+    return { sig: 'final' + win, html: `<div class="big">${win ? '🏆' : '👏'}</div><h1>${win ? 'فريقك فاز!' : 'انتهت الفعالية'}</h1><div class="mut">نقاطك: ${ME.score}</div>` };
+  }
+  if (S.phase === 'results') {
+    const p = ME.last?.pts || 0;
+    return { sig: 'res' + S.roundNo + p, html: `<div class="mut">نتيجتك في الجولة</div><div class="pts ${p > 0 ? 'ok' : p < 0 ? 'bad' : ''}">${p > 0 ? '+' : ''}${p}</div><div class="mut">${esc(ME.last?.detail || 'لم تحصل على نقاط')}</div>` + waitView('', 'انتظر الجولة القادمة…') };
+  }
+  if (!r) return { sig: 'wait', html: waitView('انتظر…') };
+
+  const base = `r${r.id}${r.phase}`;
+  if (r.phase === 'countdown') return { sig: base, html: `<div class="mut">${esc(r.title)}</div><div class="big"><span data-until="${r.until}" data-mode="int"></span></div><div class="mut">استعد!</div>` };
+  if (r.phase === 'flash') return { sig: base, html: `<h1>👀 انظر للشاشة الكبيرة!</h1><div class="mut">احفظ العناصر</div>` };
+
+  switch (r.kind) {
+    case 'race': {
+      if (st.status === 'correct') return { sig: base + 'c', html: `<div class="big">✅</div><h1>إجابة صحيحة!</h1><div class="mut">انتظر النتائج…</div><div class="mut" id="cnt">${r.answered} / ${r.total}</div>` };
+      if (st.status === 'dead') return { sig: base + 'd', html: `<div class="big">❌</div><h1>إجابة خاطئة</h1><div class="mut">انتظر الجولة القادمة</div>` };
+      if (r.options) return { sig: base, html: `<h2>${esc(r.prompt)}</h2><div class="opts">${r.options.map((o) => `<button onclick="answer(this.textContent)">${o}</button>`).join('')}</div>` };
+      return {
+        sig: base,
+        html: `<h2>${esc(r.prompt)}</h2>
+          ${r.display ? `<div class="display">${esc(r.display)}</div>` : ''}
+          ${r.tiles ? `<div class="tiles">${r.tiles.map((c) => `<span>${esc(c)}</span>`).join('')}</div>` : ''}
+          <input id="inp" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="اكتب هنا…">
+          <button class="btn" id="go">إرسال</button>`,
+        after() {
+          const i = $('#inp'); i.focus();
+          const send = () => { if (i.value.trim()) answer(i.value); };
+          $('#go').onclick = send; i.addEventListener('keydown', (e) => e.key === 'Enter' && send());
+        },
+      };
+    }
+    case 'closest':
+      return {
+        sig: base,
+        html: `<h2>${esc(r.prompt)}</h2><input id="inp" inputmode="decimal" autocomplete="off" placeholder="رقمك">
+          <button class="btn" id="go">إرسال</button><div class="mut" id="sent">${st.value ? 'إجابتك: ' + esc(st.value) + ' (يمكنك التعديل)' : 'أرسل تخمينك'}</div>`,
+        after() {
+          const i = $('#inp'); i.focus();
+          const send = () => { if (i.value.trim()) answer(i.value); };
+          $('#go').onclick = send; i.addEventListener('keydown', (e) => e.key === 'Enter' && send());
+        },
+      };
+    case 'buzzer': {
+      const s = st.status;
+      const msg = s === 'held' ? '🎤 دورك! جاوب بصوت عالٍ' : s === 'blocked' ? `⚡ ${esc(r.holder?.name || '')} ضغط قبلك` : s === 'out' ? '🚫 أُقصيت من هذا السؤال' : '';
+      return { sig: base + s, html: `<h2>${esc(r.prompt)}</h2><button class="giant buzz" ${s === 'open' ? '' : 'disabled'} id="bz">BUZZ<br>🔴</button><h2>${msg}</h2>`, after() { const b = $('#bz'); b.addEventListener('pointerdown', () => { vib(40); sock.emit('buzz'); }); } };
+    }
+    case 'bomb':
+      if (st.status === 'hasBomb') return { sig: base + 'h', html: `<h2>${esc(r.prompt)}</h2><div class="mut">قُل إجابتك بصوت عالٍ ثم مرّر!</div><button class="giant bombbtn" id="ps">مرّر<br>💣</button>`, after() { vib([100, 60, 100]); $('#ps').addEventListener('pointerdown', () => sock.emit('pass')); } };
+      return { sig: base + 'i', html: `<div class="big" style="opacity:.5">💣</div><h2>القنبلة مع ${esc(r.holder?.name || '')}</h2><div class="mut">${esc(r.prompt)}</div>` };
+    case 'reaction': {
+      const s = st.status;
+      if (s === 'out') return { sig: base + 'out', html: `<div class="big">❌</div><h1>ضغطت بدري!</h1><div class="mut">خرجت من الجولة</div>` };
+      if (s === 'ok') return { sig: base + 'ok', html: `<div class="big">✅</div><h1>تم تسجيل ضغطتك</h1><div class="mut">انتظر النتائج</div>` };
+      const go = r.state === 'go';
+      return { sig: base + r.state, html: `<div class="mut">${go ? '' : 'لا تضغط حتى يتحول للأخضر!'}</div><button class="giant ${go ? 'go' : 'wait'}" id="rb">${go ? 'اضغط الآن!' : 'لا تضغط!'}</button>`, after() { if (go) vib(80); $('#rb').addEventListener('pointerdown', () => sock.emit('press')); } };
+    }
+  }
+  return { sig: 'x', html: '' };
+}
+
+function render() {
+  header();
+  const v = view();
+  if (v.sig === sig) {
+    if (S?.round && $('#cnt')) $('#cnt').textContent = `${S.round.answered} / ${S.round.total}`;
+    return;
+  }
+  sig = v.sig;
+  main.innerHTML = v.html;
+  v.after && v.after();
+}
+runTimers();
+</script>
+</body>
+</html>

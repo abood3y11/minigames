@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PLAYROOM — الشاشة</title>
+<link rel="stylesheet" href="/common.css">
+<style>
+  body { overflow: hidden; height: 100vh; }
+  #app { height: 100vh; display: flex; flex-direction: column; padding: 2vh 3vw; gap: 2vh; }
+  #scores { display: flex; gap: 1.5vw; direction: ltr; }
+  .sc { flex: 1; background: var(--panel); border-radius: 22px; border: 3px solid var(--c); padding: 1.2vh 1.5vw; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 0 40px -12px var(--c); transition: transform .3s; }
+  .sc.bump { animation: pulse .5s; }
+  .sc b { font-size: 3.2vh; letter-spacing: .1em; color: var(--c); }
+  .sc span { font-size: 6vh; font-weight: 900; font-variant-numeric: tabular-nums; }
+  #stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 2.5vh; min-height: 0; }
+  .title { font-size: 3.4vh; color: var(--mut); letter-spacing: .05em; }
+  .prompt { font-size: 8vh; font-weight: 800; line-height: 1.25; max-width: 90vw; }
+  .big { font-size: 22vh; font-weight: 900; line-height: 1; }
+  .cnt { font-size: 4.4vh; color: var(--mut); }
+  .cnt b { color: var(--text); font-size: 6vh; }
+  .timerbox { width: min(70vw, 1100px); display: flex; align-items: center; gap: 1.5vw; direction: ltr; }
+  .timerbox .bar { flex: 1; height: 2vh; }
+  .timerbox .tm { font-size: 5vh; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 9vh; }
+  .tiles { display: flex; gap: 1.2vw; flex-wrap: wrap; justify-content: center; }
+  .tile { background: var(--panel2); border-radius: 18px; min-width: 12vh; padding: 1vh 2vh; font-size: 11vh; font-weight: 900; animation: pop .35s backwards; }
+  .emos { display: flex; gap: 2vw; flex-wrap: wrap; justify-content: center; max-width: 85vw; font-size: 15vh; }
+  .emos span { animation: pop .4s backwards; }
+  .opts { display: flex; gap: 2vw; font-size: 12vh; }
+  .opts span { background: var(--panel2); border-radius: 22px; padding: 1vh 2.5vw; }
+  .lobby { display: flex; gap: 5vw; align-items: center; justify-content: center; width: 100%; }
+  .lobby img { height: 62vh; max-width: 40vw; border-radius: 26px; background: #fff; padding: 14px; }
+  .lobby .side { text-align: right; max-width: 48vw; }
+  .lobby h1 { font-size: 9vh; margin: 0 0 1vh; }
+  .lobby .url { direction: ltr; text-align: right; font-size: 3.6vh; color: var(--mut); margin: 1vh 0 2vh; }
+  .lobby .n { font-size: 6vh; font-weight: 800; margin-bottom: 2vh; }
+  .chips { display: flex; flex-wrap: wrap; gap: 1vh 1vw; max-height: 26vh; overflow: hidden; }
+  .chip { background: var(--panel); border: 2px solid var(--c); border-radius: 99px; padding: .5vh 1.4vw; font-size: 2.6vh; animation: pop .3s backwards; }
+  .chip.off { opacity: .4; }
+  .rows { width: min(70vw, 1000px); display: flex; flex-direction: column; gap: 1.2vh; }
+  .rrow { display: flex; align-items: center; gap: 1.5vw; background: var(--panel); border-radius: 18px; padding: 1.2vh 2vw; font-size: 4vh; border-right: 1vw solid var(--c); animation: slide .5s backwards; }
+  .rrow .m { width: 7vh; font-size: 5vh; }
+  .rrow .nm { flex: 1; text-align: right; font-weight: 800; }
+  .rrow .dt { color: var(--mut); font-size: 3vh; direction: ltr; }
+  .rrow .pt { font-weight: 900; min-width: 10vh; text-align: left; direction: ltr; }
+  .pt.pos { color: var(--ok); } .pt.neg { color: var(--bad); }
+  .ans { font-size: 5.5vh; } .ans b { color: #22d3ee; }
+  .deltas { display: flex; gap: 2vw; direction: ltr; font-size: 5vh; font-weight: 900; }
+  .deltas span { color: var(--c); animation: pop .5s backwards; }
+  .holder { font-size: 8vh; font-weight: 900; color: var(--c); animation: pop .3s; }
+  .bomb { font-size: 30vh; line-height: 1; display: inline-block; animation: pulse .6s infinite; filter: drop-shadow(0 0 40px #f59e0b); }
+  .bomb.boom { animation: none; transform: scale(1.4); filter: drop-shadow(0 0 80px #ef4444); }
+  .circle { width: 60vh; height: 60vh; border-radius: 50%; display: grid; place-items: center; font-size: 8vh; font-weight: 900; transition: background .05s; }
+  .circle.wait { background: #b91c1c; box-shadow: 0 0 120px #ef444488; }
+  .circle.go { background: #16a34a; box-shadow: 0 0 160px #22c55eaa; animation: pulse .35s infinite; }
+  .winner { font-size: 16vh; font-weight: 900; color: var(--c); text-shadow: 0 0 60px var(--c); animation: pop .8s; }
+  .final-pts { font-size: 9vh; font-weight: 800; }
+  #fx { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #snd { position: fixed; bottom: 12px; left: 12px; z-index: 9; background: #ffffff22; border-radius: 99px; padding: 8px 16px; font-size: 16px; }
+  .live { color: #ef4444; font-size: 3vh; font-weight: 800; }
+</style>
+</head>
+<body>
+<div id="app"><div id="scores"></div><div id="stage"></div></div>
+<canvas id="fx"></canvas>
+<button id="snd">🔇 اضغط لتفعيل الصوت</button>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/common.js"></script>
+<script>
+let S = null, prev = null, sig = '', soundOn = false, AC = null;
+const stage = $('#stage'), scoresEl = $('#scores');
+
+// ---------- sound ----------
+function ac() { return AC || (AC = new (window.AudioContext || window.webkitAudioContext)()); }
+function tone(f, d = .15, type = 'sine', vol = .25, at = 0) {
+  if (!soundOn) return;
+  const c = ac(), o = c.createOscillator(), g = c.createGain(), t = c.currentTime + at;
+  o.type = type; o.frequency.value = f; o.connect(g); g.connect(c.destination);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + d);
+  o.start(t); o.stop(t + d + .02);
+}
+function boomSound() {
+  if (!soundOn) return;
+  const c = ac(), len = c.sampleRate * 1.2, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+  const s = c.createBufferSource(), g = c.createGain(); s.buffer = b; g.gain.value = .8; s.connect(g); g.connect(c.destination); s.start();
+}
+const SFX = {
+  tick: () => tone(660, .08, 'square', .12),
+  live: () => { tone(880, .25, 'square', .2); },
+  buzz: () => { tone(220, .35, 'sawtooth', .3); tone(330, .35, 'sawtooth', .2, .05); },
+  go: () => tone(1000, .3, 'square', .25),
+  results: () => { tone(523, .15, 'triangle', .3); tone(659, .15, 'triangle', .3, .12); tone(784, .3, 'triangle', .3, .24); },
+  boom: boomSound,
+  win: () => [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, .25, 'triangle', .3, i * .16)),
+};
+$('#snd').onclick = () => { soundOn = true; ac().resume(); $('#snd').remove(); SFX.live(); };
+
+// ---------- confetti ----------
+const cv = $('#fx'), cx = cv.getContext('2d'); let parts = [], confettiOn = false;
+function resize() { cv.width = innerWidth; cv.height = innerHeight; } resize(); addEventListener('resize', resize);
+function confetti(on) { confettiOn = on; if (on) loopConfetti(); }
+function loopConfetti() {
+  if (!confettiOn && !parts.length) { cx.clearRect(0, 0, cv.width, cv.height); return; }
+  cx.clearRect(0, 0, cv.width, cv.height);
+  if (confettiOn) for (let i = 0; i < 6; i++) parts.push({ x: Math.random() * cv.width, y: -20, vx: Math.random() * 4 - 2, vy: Math.random() * 4 + 3, r: Math.random() * 8 + 5, c: `hsl(${Math.random() * 360},90%,60%)`, a: Math.random() * 6 });
+  parts = parts.filter((p) => p.y < cv.height + 30);
+  for (const p of parts) { p.x += p.vx; p.y += p.vy; p.a += .1; cx.save(); cx.translate(p.x, p.y); cx.rotate(p.a); cx.fillStyle = p.c; cx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); cx.restore(); }
+  requestAnimationFrame(loopConfetti);
+}
+
+// ---------- rendering ----------
+const teamStyle = (t) => `--c:${tcolor(t)}`;
+function scoresHtml(s) {
+  return s.teams.map((t) => `<div class="sc" style="--c:${t.color}" data-t="${t.id}"><b>${t.emoji} ${t.en}</b><span>${t.score}</span></div>`).join('');
+}
+function timerHtml(from, to) {
+  return `<div class="timerbox"><span class="tm" data-until="${to}"></span><div class="bar" data-bar="${from},${to}"><i></i></div></div>`;
+}
+const counter = (r) => `<div class="cnt"><b>${r.answered}</b> / ${r.total} ${r.kind === 'closest' ? 'أجابوا' : r.kind === 'reaction' ? 'ضغطوا' : 'أجابوا صح'}</div>`;
+
+function roundHtml(s) {
+  const r = s.round, head = `<div class="title">الجولة ${s.roundNo + 1} · ${esc(r.title)}</div>`;
+  if (r.phase === 'countdown') return `${head}<div class="big" style="font-size:36vh"><span data-until="${r.until}" data-mode="int"></span></div><div class="cnt">استعدّوا…</div>`;
+  if (r.phase === 'flash') return `${head}<div class="prompt">احفظوا!</div><div class="emos">${r.flash.map((e, i) => `<span style="animation-delay:${i * .08}s">${e}</span>`).join('')}</div>${timerHtml(r.until - r.flashMs, r.until)}`;
+  const fullTimer = r.endsAt ? timerHtml(r.from, r.endsAt) : '';
+  switch (r.kind) {
+    case 'race':
+      return `${head}<div class="prompt" style="font-size:5vh;color:var(--mut)">${esc(r.prompt)}</div>
+        ${r.display ? `<div class="prompt">${esc(r.display)}</div>` : ''}
+        ${r.tiles ? `<div class="tiles">${r.tiles.map((c, i) => `<div class="tile" style="animation-delay:${i * .06}s">${esc(c)}</div>`).join('')}</div>` : ''}
+        ${r.options ? `<div class="opts">${r.options.map((o) => `<span>${o}</span>`).join('')}</div>` : ''}
+        ${counter(r)}${fullTimer}`;
+    case 'closest':
+      return `${head}<div class="prompt">${esc(r.prompt)}</div>${counter(r)}${fullTimer}`;
+    case 'buzzer':
+      if (r.state === 'held') {
+        const t = s.teams[r.holder.team];
+        return `${head}<div class="prompt" style="font-size:6vh">${esc(r.prompt)}</div>
+          <div class="holder" style="${teamStyle(r.holder.team)}">⚡ ${esc(r.holder.name)}</div>
+          <div class="cnt">ضغط خلال <b>${(r.buzzMs / 1000).toFixed(3)}</b> ثانية · ${t ? t.emoji + ' ' + t.name : ''}</div>
+          ${timerHtml(r.heldUntil - r.answerSec * 1000, r.heldUntil)}`;
+      }
+      return `${head}<div class="prompt">${esc(r.prompt)}</div><div class="live">🔴 البازر مفتوح — اضغطوا!</div>${r.outCount ? `<div class="cnt">أُقصي ${r.outCount}</div>` : ''}`;
+    case 'bomb': {
+      const h = r.holder;
+      return `${head}<div class="prompt" style="font-size:6vh">${esc(r.prompt)}</div><div class="bomb">💣</div>
+        <div class="holder" style="${teamStyle(h?.team)}">${esc(h?.name || '')}</div><div class="cnt">التمريرات: <b>${r.passes}</b></div>`;
+    }
+    case 'reaction':
+      return `${head}<div class="circle ${r.state}">${r.state === 'go' ? 'اضغط الآن!' : 'لا تضغط!'}</div>${counter(r)}`;
+  }
+  return head;
+}
+
+function lobbyHtml(s) {
+  const chips = (s.players || []).slice(-60).map((p) => `<span class="chip ${p.o ? '' : 'off'}" style="${teamStyle(p.t)}">${esc(p.n)}</span>`).join('');
+  return `<div class="lobby"><img src="/api/qr?${s.joinUrl}" alt="QR"><div class="side">
+    <h1>${esc(s.event)}</h1><div class="n">👥 ${s.online} لاعب متصل</div>
+    <div class="title">امسح الكود للدخول</div><div class="url">${esc(s.joinUrl)}</div><div class="chips">${chips}</div></div></div>`;
+}
+
+function resultsHtml(s) {
+  const L = s.last;
+  const rows = L.rows.slice(0, 10).map((r, i) => `<div class="rrow" style="${teamStyle(r.team)};animation-delay:${i * .12}s">
+    <span class="m">${r.pts >= 0 && L.kind !== 'bomb' ? MEDAL[i] || i + 1 : '💥'}</span><span class="nm">${esc(r.name)}</span><span class="dt">${esc(r.detail)}</span>
+    <span class="pt ${r.pts > 0 ? 'pos' : r.pts < 0 ? 'neg' : ''}">${r.pts > 0 ? '+' : ''}${r.pts}</span></div>`).join('') || '<div class="cnt">لا أحد أجاب 😅</div>';
+  const deltas = s.teams.map((t) => `<span style="--c:${t.color}">${t.emoji} ${L.teamDelta[t.id] > 0 ? '+' : ''}${L.teamDelta[t.id]}</span>`).join('');
+  return `<div class="title">نتيجة · ${esc(L.title)}</div>
+    ${L.answer ? `<div class="ans">الإجابة: <b>${esc(L.answer)}</b></div>` : ''}
+    ${L.kind === 'bomb' && L.rows[0] ? `<div class="bomb boom" style="font-size:16vh">💥</div>` : ''}
+    <div class="rows">${rows}</div><div class="deltas">${deltas}</div>`;
+}
+
+function finalHtml(s) {
+  const w = s.final.winners, many = w.length > 1;
+  const name = many ? 'تعادل! ' + w.map((i) => s.teams[i].emoji).join(' ') : `TEAM ${s.teams[w[0]].en}`;
+  const stand = [...s.teams].sort((a, b) => b.score - a.score).map((t) => `<div class="rrow" style="--c:${t.color}"><span class="nm">${t.emoji} ${t.name}</span><span class="pt">${t.score}</span></div>`).join('');
+  const top = s.top.slice(0, 3).map((p, i) => `<span class="chip" style="${teamStyle(p.t)}">${MEDAL[i]} ${esc(p.n)} · ${p.s}</span>`).join(' ');
+  return `<div class="title">🏆 الفائز</div><div class="winner" style="${teamStyle(w[0])}">${name}</div>
+    <div class="final-pts">${s.final.score} POINTS</div><div class="rows">${stand}</div><div class="chips" style="justify-content:center">${top}</div>`;
+}
+
+function render(s) {
+  const roundSig = s.round ? [s.round.id, s.round.phase, s.round.state, s.round.holder?.name, s.round.passes, s.round.answered, s.round.outCount].join('|') : '';
+  const lobbySig = s.phase === 'lobby' ? s.players.map((p) => p.n + p.t + p.o).join(',') + s.joinUrl : '';
+  const newSig = [s.phase, roundSig, lobbySig, s.last && s.roundNo, s.final?.winners].join('#');
+
+  // header scores (animate bump on change)
+  const sc = s.teams.map((t) => `${t.id}:${t.score}`).join();
+  if (scoresEl.dataset.sig !== sc) {
+    const old = scoresEl.dataset.sig; scoresEl.dataset.sig = sc;
+    scoresEl.innerHTML = scoresHtml(s);
+    if (old) s.teams.forEach((t) => { if (!old.includes(`${t.id}:${t.score}`)) scoresEl.children[t.id]?.classList.add('bump'); });
+  }
+  scoresEl.style.display = s.phase === 'lobby' || s.phase === 'final' ? 'none' : 'flex';
+
+  if (newSig === sig) return;
+  sig = newSig;
+  if (s.phase === 'lobby') stage.innerHTML = lobbyHtml(s);
+  else if (s.phase === 'round' && s.round) stage.innerHTML = roundHtml(s);
+  else if (s.phase === 'results' && s.last) stage.innerHTML = resultsHtml(s);
+  else if (s.phase === 'final' && s.final) stage.innerHTML = finalHtml(s);
+
+  // sounds / effects on transitions
+  const p = prev, r = s.round;
+  if (r && (!p?.round || p.round.id !== r.id || p.round.phase !== r.phase)) {
+    if (r.phase === 'live') { if (r.kind === 'race') SFX.live(); }
+  }
+  if (r?.kind === 'buzzer' && r.state === 'held' && !(p?.round?.state === 'held')) SFX.buzz();
+  if (r?.kind === 'reaction' && r.state === 'go' && p?.round?.state !== 'go') SFX.go();
+  if (s.phase === 'results' && p?.phase !== 'results') s.last?.kind === 'bomb' ? SFX.boom() : SFX.results();
+  if (s.phase === 'final' && p?.phase !== 'final') { SFX.win(); confetti(true); } else if (s.phase !== 'final') confetti(false);
+  prev = s;
+}
+
+const sock = connect({ role: 'screen' }, {
+  state(s) {
+    S = s; render(s);
+  },
+});
+runTimers((_, v) => { if (v <= 3) SFX.tick(); });
+</script>
+</body>
+</html>

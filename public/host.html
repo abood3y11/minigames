@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PLAYROOM — لوحة المضيف</title>
+<link rel="stylesheet" href="/common.css">
+<style>
+  body { padding: 16px; max-width: 1280px; margin: 0 auto; }
+  h2 { margin: 0 0 10px; font-size: 18px; color: var(--mut); font-weight: 600; }
+  .grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; } @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border-radius: 18px; padding: 16px; margin-bottom: 16px; }
+  .top { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .top input { flex: 1; min-width: 160px; }
+  input, select, textarea { font: inherit; background: var(--bg); color: var(--text); border: 1px solid #ffffff30; border-radius: 10px; padding: 9px 12px; width: 100%; }
+  label { display: block; font-size: 13px; color: var(--mut); margin: 8px 0 3px; }
+  .btn { background: var(--panel2); border-radius: 10px; padding: 9px 14px; font-weight: 700; }
+  .btn:hover { filter: brightness(1.2); } .btn.pri { background: var(--acc); } .btn.ok { background: #16a34a; } .btn.bad { background: #b91c1c; } .btn.big { padding: 14px 22px; font-size: 18px; }
+  .btn.sel { outline: 2px solid var(--acc); }
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .g { background: var(--panel2); border-radius: 14px; padding: 14px 8px; font-size: 16px; font-weight: 700; text-align: center; border: 2px solid transparent; }
+  .g.sel { border-color: var(--acc); background: #2a2f6a; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .score { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: var(--bg); border-right: 6px solid var(--c); margin-bottom: 8px; }
+  .score b { flex: 1; color: var(--c); } .score .v { font-size: 26px; font-weight: 900; min-width: 60px; text-align: center; direction: ltr; }
+  .score .btn { padding: 5px 9px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; } td { padding: 5px 4px; border-bottom: 1px solid #ffffff12; }
+  .off { opacity: .4; }
+  .live { border: 2px solid var(--acc); }
+  .secret { background: #1a3a2a; color: #86efac; padding: 8px 12px; border-radius: 10px; font-size: 20px; font-weight: 800; margin: 8px 0; }
+  .tm { font-size: 30px; font-weight: 900; direction: ltr; display: inline-block; min-width: 80px; }
+  .urlbox { direction: ltr; font-family: monospace; background: var(--bg); padding: 6px 10px; border-radius: 8px; }
+  #err { position: fixed; bottom: 14px; right: 14px; background: #b91c1c; padding: 10px 16px; border-radius: 10px; display: none; z-index: 9; }
+  #denied { display: none; text-align: center; padding: 60px 10px; }
+</style>
+</head>
+<body>
+<div id="denied"><h1>🔒 غير مصرّح</h1><p>افتح الرابط مع مفتاح المضيف المطبوع في الطرفية:<br><code dir="ltr">/host?key=XXXXXX</code><br>أو افتح <code dir="ltr">http://localhost:3000/host</code> من نفس الجهاز.</p></div>
+<div id="ui">
+  <div class="card top">
+    <input id="ev" placeholder="اسم الفعالية" maxlength="40">
+    <span class="mut">الفرق:</span>
+    <span id="tc"></span>
+    <button class="btn" onclick="window.open('/screen','_blank')">🖥️ الشاشة الكبيرة</button>
+    <button class="btn" onclick="emit('lobby')">🏠 لوبي / QR</button>
+    <button class="btn" onclick="emit('shuffle')">🔀 خلط الفرق</button>
+    <button class="btn pri" onclick="if(confirm('إنهاء الفعالية وإعلان الفائز؟'))emit('final')">🏆 الفائز</button>
+    <button class="btn bad" onclick="if(confirm('تصفير كل النقاط؟'))emit('reset')">♻️ إعادة</button>
+  </div>
+  <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <span>🔗 رابط اللاعبين:</span><span class="urlbox" id="url"></span><select id="ip" style="width:auto"></select>
+    <span id="online"></span>
+  </div>
+  <div class="grid">
+    <div>
+      <div id="livebox"></div>
+      <div class="card"><h2>اختر اللعبة</h2><div class="games" id="games"></div><div id="form"></div></div>
+    </div>
+    <div>
+      <div class="card"><h2>النقاط</h2><div id="scores"></div></div>
+      <div class="card"><h2>اللاعبون</h2><div id="players" style="max-height:50vh;overflow:auto"></div></div>
+    </div>
+  </div>
+</div>
+<div id="err"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/common.js"></script>
+<script>
+const key = new URLSearchParams(location.search).get('key') || '';
+let S = null, H = null, BANK = null, game = null, sigs = {};
+const emit = (ev, d) => sock.emit(ev, d, (r) => { if (r && !r.ok) err(r.err); });
+const err = (m) => { const e = $('#err'); e.textContent = m; e.style.display = 'block'; setTimeout(() => (e.style.display = 'none'), 3500); };
+const sock = connect({ role: 'host', key }, {
+  denied() { $('#ui').style.display = 'none'; $('#denied').style.display = 'block'; },
+  state(s) { S = s; render(); },
+  hstate(h) { H = h; render(); },
+});
+fetch('/api/bank').then((r) => r.json()).then((b) => { BANK = b; });
+
+const GAMES = [
+  ['type', '⚡ أسرع كتابة'], ['scramble', '🧠 فك الكلمة'], ['fill', '🔥 اكمل الجملة'], ['memory', '👀 Memory Flash'],
+  ['closest', '🎯 أقرب إجابة'], ['buzzer', '🔴 Buzzer'], ['bomb', '💣 القنبلة'], ['reaction', '😈 لا تضغط'],
+];
+const F = (id, label, val, type = 'text') => `<div><label>${label}</label><input id="f_${id}" type="${type}" value="${esc(val ?? '')}"></div>`;
+const FT = (id, label, val) => `<div><label>${label}</label><textarea id="f_${id}" rows="2">${esc(val ?? '')}</textarea></div>`;
+const pk = (a) => a[Math.floor(Math.random() * a.length)];
+
+function formFor(g) {
+  const b = BANK || {};
+  switch (g) {
+    case 'type': return FT('text', 'الجملة', pk(b.type || [''])) + F('duration', 'المدة (ثانية)', 30, 'number');
+    case 'scramble': return F('word', 'الكلمة (تُخلط تلقائياً)', pk(b.scramble || [''])) + F('duration', 'المدة', 40, 'number');
+    case 'fill': { const x = pk(b.fill || [{}]); return F('prompt', 'بداية الجملة', x.prompt) + F('answer', 'الإجابة (افصل البدائل بـ |)', x.answer) + F('duration', 'المدة', 30, 'number'); }
+    case 'memory': return `<div class="row2">${F('count', 'عدد العناصر', 9, 'number')}${F('showSec', 'مدة العرض (ث)', 4, 'number')}</div><div class="mut">السؤال يُولَّد تلقائياً</div>`;
+    case 'closest': { const x = pk(b.closest || [{}]); return F('prompt', 'السؤال', x.prompt) + `<div class="row2">${F('answer', 'الإجابة الصحيحة', x.answer, 'number')}${F('unit', 'الوحدة', x.unit)}</div>` + F('duration', 'المدة', 30, 'number'); }
+    case 'buzzer': { const x = pk(b.buzzer || [{}]); return F('prompt', 'السؤال', x.prompt) + F('answer', 'الإجابة (تظهر لك فقط)', x.answer) + `<div class="row2">${F('answerSec', 'وقت الإجابة', 5, 'number')}${F('points', 'نقاط الصح', 10, 'number')}</div>${F('penalty', 'خصم الغلط', 5, 'number')}`; }
+    case 'bomb': return F('prompt', 'التحدي', pk(b.bomb || [''])) + `<div class="row2">${F('minSec', 'أقل مدة (ث)', 5, 'number')}${F('maxSec', 'أكثر مدة (ث)', 12, 'number')}</div>`;
+    case 'reaction': return `<div class="row2">${F('minDelay', 'أقل انتظار (ث)', 2, 'number')}${F('maxDelay', 'أكثر انتظار (ث)', 6, 'number')}</div>`;
+  }
+  return '';
+}
+function pickGame(g) {
+  game = g;
+  renderGames();
+  $('#form').innerHTML = `<div style="margin-top:12px">${formFor(g)}<div style="display:flex;gap:8px;margin-top:12px"><button class="btn big pri" style="flex:1" onclick="startGame()">▶ ابدأ الجولة</button><button class="btn big" onclick="pickGame(game)" title="اقتراح آخر">🎲</button></div></div>`;
+}
+function startGame() {
+  const params = {};
+  document.querySelectorAll('#form [id^=f_]').forEach((el) => (params[el.id.slice(2)] = el.value));
+  emit('start', { game, params });
+}
+function renderGames() {
+  $('#games').innerHTML = GAMES.map(([id, n]) => `<button class="g ${game === id ? 'sel' : ''}" onclick="pickGame('${id}')">${n}</button>`).join('');
+}
+
+function setSig(k, v, fn) { if (sigs[k] !== v) { sigs[k] = v; fn(); } }
+
+function render() {
+  if (!S) return;
+  const evEl = $('#ev'); if (document.activeElement !== evEl && evEl.value !== S.event) evEl.value = S.event;
+  $('#tc').innerHTML = [2, 3, 4].map((n) => `<button class="btn ${S.teams.length === n ? 'sel' : ''}" onclick="emit('config',{teamCount:${n}})">${n}</button>`).join(' ');
+  $('#url').textContent = S.joinUrl;
+  $('#online').textContent = `👥 ${S.online} متصل`;
+  setSig('games', game, renderGames);
+
+  // scores
+  setSig('scores', JSON.stringify(S.teams.map((t) => [t.id, t.score, t.count])), () => {
+    $('#scores').innerHTML = S.teams.map((t) => `<div class="score" style="--c:${t.color}"><b>${t.emoji} ${t.name} <small class="mut">(${t.count})</small></b>
+      <button class="btn" onclick="emit('adjust',{team:${t.id},delta:-5})">−5</button><button class="btn" onclick="emit('adjust',{team:${t.id},delta:-1})">−1</button>
+      <span class="v">${t.score}</span>
+      <button class="btn" onclick="emit('adjust',{team:${t.id},delta:1})">+1</button><button class="btn" onclick="emit('adjust',{team:${t.id},delta:5})">+5</button><button class="btn" onclick="emit('adjust',{team:${t.id},delta:10})">+10</button></div>`).join('');
+  });
+
+  if (!H) return;
+  // ip select
+  setSig('ip', H.ip + H.ips.length, () => { $('#ip').innerHTML = H.ips.map((i) => `<option value="${i.address}" ${i.address === H.ip ? 'selected' : ''}>${i.address} (${esc(i.name)})</option>`).join(''); $('#ip').onchange = (e) => emit('config', { ip: e.target.value }); });
+
+  // players
+  setSig('players', JSON.stringify(H.players) + S.teams.length, () => {
+    $('#players').innerHTML = `<table>${H.players.map((p) => `<tr class="${p.online ? '' : 'off'}"><td>${esc(p.name)}</td><td>${p.score}</td>
+      <td><select onchange="emit('setTeam',{id:'${p.id}',team:+this.value})" style="width:auto;padding:3px">${S.teams.map((t) => `<option value="${t.id}" ${t.id === p.team ? 'selected' : ''}>${t.emoji} ${t.name}</option>`).join('')}</select></td>
+      <td><button class="btn" style="padding:2px 8px" onclick="if(confirm('إزالة ${esc(p.name)}؟'))emit('kick',{id:'${p.id}'})">✕</button></td></tr>`).join('') || '<tr><td class="mut">لا يوجد لاعبون بعد</td></tr>'}</table>`;
+  });
+
+  // live round panel
+  const r = S.round;
+  const lsig = r ? [r.id, r.phase, r.state, r.answered, r.holder?.name, r.passes, JSON.stringify(H.live || [])].join('|') : 'none' + S.phase;
+  setSig('live', lsig, () => {
+    if (!r) {
+      $('#livebox').innerHTML = S.phase === 'results' ? `<div class="card"><h2>آخر جولة: ${esc(S.last?.title || '')}</h2><div class="mut">الإجابة: ${esc(S.last?.answer ?? '—')} · اختر الجولة التالية 👇</div></div>` : '';
+      return;
+    }
+    const timer = r.endsAt ? `<span class="tm" data-until="${r.endsAt}"></span>` : '';
+    const buzz = r.kind === 'buzzer' && r.state === 'held' ? `<div style="margin:10px 0"><b>⚡ ${esc(r.holder.name)}</b> ضغط (${(r.buzzMs / 1000).toFixed(3)}ث) — <span class="tm" style="font-size:20px" data-until="${r.heldUntil}"></span><br>
+      <button class="btn big ok" onclick="emit('judge',{ok:true})">✅ صح</button> <button class="btn big bad" onclick="emit('judge',{ok:false})">❌ غلط</button></div>` : '';
+    const bomb = r.kind === 'bomb' ? `<button class="btn big" onclick="emit('bombPass')">↪ مرّر القنبلة</button>` : '';
+    $('#livebox').innerHTML = `<div class="card live"><h2>🔴 جارية: ${esc(r.title)} — ${r.phase === 'countdown' ? 'عدّ تنازلي' : r.phase === 'flash' ? 'عرض' : 'مباشر'}</h2>
+      ${H.secret ? `<div class="secret">الإجابة: ${esc(H.secret)}</div>` : ''}
+      <div>${timer} <span class="mut">${r.answered ?? 0} / ${r.total}</span></div>${buzz}
+      <div style="display:flex;gap:8px;margin:8px 0">${bomb}<button class="btn big bad" onclick="emit('end')">⏹ إنهاء الآن</button></div>
+      <table>${(H.live || []).map((x) => `<tr><td style="color:${tcolor(x.team)}">${esc(x.name)}</td><td>${esc(x.detail)}</td></tr>`).join('')}</table></div>`;
+  });
+}
+runTimers();
+renderGames();
+</script>
+</body>
+</html>

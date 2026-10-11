@@ -1,0 +1,15 @@
+{
+  "name": "playroom",
+  "version": "1.0.0",
+  "description": "PLAYROOM - Live event mini games over local Wi-Fi",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.2.1",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.4"
+  }
+}
